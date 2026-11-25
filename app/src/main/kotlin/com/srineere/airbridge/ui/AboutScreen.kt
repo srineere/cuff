@@ -36,7 +36,7 @@ import com.srineere.airbridge.Band
 import com.srineere.airbridge.CrashLog
 import com.srineere.airbridge.ui.theme.extras
 import com.srineere.airbridge.BuildConfig
-import dev.airpulse.fitbit_air.airResult
+import com.srineere.airbridge.band.bandResult
 
 /**
  * Read in the order that matters to someone holding the phone: the band in
@@ -61,7 +61,7 @@ internal fun AboutScreen(onBack: () -> Unit) {
     // bad timing rather than a band out of range.
     LaunchedEffect(attempt) {
         failure = null
-        Band.readDeviceInfo(context, airResult(
+        Band.readDeviceInfo(context, bandResult(
             onSuccess = { info = it as? Map<*, *> },
             onError = { code, _ ->
                 failure = if (code == "BUSY") "Cuff is busy sending a notification to the band."

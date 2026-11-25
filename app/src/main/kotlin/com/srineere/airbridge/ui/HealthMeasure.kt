@@ -13,7 +13,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import com.srineere.airbridge.Band
 import com.srineere.airbridge.health.HeartSample
-import dev.airpulse.fitbit_air.AirSink
+import com.srineere.airbridge.band.BandSink
 import kotlinx.coroutines.delay
 
 /** Where a live reading is between asking for it and having one. */
@@ -111,7 +111,7 @@ internal fun rememberMeasure(): MeasureHolder {
         start = {
             state = Measure.Starting
             samples.clear()
-            val started = Band.measureHeartRate(context, object : AirSink {
+            val started = Band.measureHeartRate(context, object : BandSink {
                 override fun success(event: Any?) {
                     val bpm = (event as? Map<*, *>)?.get("beatsPerMinute") as? Int ?: return
                     samples += HeartSample(System.currentTimeMillis(), bpm)

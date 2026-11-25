@@ -82,7 +82,7 @@ import com.srineere.airbridge.ui.theme.extras
 import com.srineere.airbridge.widget.BandStore
 import com.srineere.airbridge.widget.WidgetRefresh
 import com.srineere.airbridge.ui.theme.isAvailable
-import dev.airpulse.fitbit_air.airResult
+import com.srineere.airbridge.band.bandResult
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.delay
 import com.srineere.airbridge.R
@@ -377,7 +377,7 @@ private fun BandCard() {
 
     fun readName() {
         if (name != null) return
-        Band.readDeviceInfo(context, airResult(
+        Band.readDeviceInfo(context, bandResult(
             onSuccess = { info ->
                 val said = (info as? Map<*, *>)
                 val found = listOf("name", "model")
@@ -397,7 +397,7 @@ private fun BandCard() {
     // One at a time: the band holds a single session, so the signal read waits
     // for the battery read rather than racing it.
     fun readings() {
-        Band.readBattery(context, airResult(
+        Band.readBattery(context, bandResult(
             onSuccess = { value ->
                 // The band answered, so it is reachable whatever the adapter
                 // said, and whatever an earlier attempt complained about.
@@ -416,7 +416,7 @@ private fun BandCard() {
                     // nothing used to pass on.
                     WidgetRefresh.poke(context)
                 }
-                Band.readSignal(context, airResult(
+                Band.readSignal(context, bandResult(
                     onSuccess = { reading ->
                         syncing = false
                         rssi = (reading as? Map<*, *>)?.get("rssi") as? Int
@@ -441,7 +441,7 @@ private fun BandCard() {
         // The adapter first, then the band. Firing both at once meant the
         // adapter's answer could land second and put "Disconnected" back on a
         // band that had just replied.
-        Band.isConnected(context, airResult(
+        Band.isConnected(context, bandResult(
             onSuccess = { connected = it as? Boolean; readings() },
             onError = { _, _ -> connected = null; readings() },
         ))
@@ -451,7 +451,7 @@ private fun BandCard() {
         if (buzz != Buzz.Idle) return
         message = null
         buzz = Buzz.Sending
-        Band.buzz(context, airResult(
+        Band.buzz(context, bandResult(
             onSuccess = { buzz = Buzz.Sent },
             onError = { code, detail ->
                 buzz = Buzz.Idle

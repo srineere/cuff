@@ -4,9 +4,10 @@ import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
-import dev.airpulse.fitbit_air.AirLink
-import dev.airpulse.fitbit_air.AirResult
-import dev.airpulse.fitbit_air.AirSink
+import com.srineere.airbridge.band.BandLink
+import com.srineere.airbridge.band.BandResult
+import com.srineere.airbridge.band.BandSink
+import com.srineere.airbridge.band.Bands
 
 /**
  * The app's way to the band.
@@ -28,11 +29,11 @@ internal object Band {
 
     private val handler = Handler(Looper.getMainLooper())
     private val queue = ArrayDeque<Work>()
-    private var link: AirLink? = null
+    private var link: BandLink? = null
     private var busy = false
     private var measuring = false
     /** The screen waiting on a live reading, so closing can answer it. */
-    private var heartSink: AirSink? = null
+    private var heartSink: BandSink? = null
     private val idle = Runnable { close() }
 
     /**
@@ -42,13 +43,13 @@ internal object Band {
      * closing does -- has to answer what is in it. Clearing it silently left
      * the screen that asked waiting on a result that was never coming.
      */
-    private class Work(val reply: AirResult, val run: (AirLink) -> Unit)
+    private class Work(val reply: BandResult, val run: (BandLink) -> Unit)
 
     /**
      * Whether the band is linked. This asks the Bluetooth adapter rather than
      * the band, so it costs no session and never waits behind one.
      */
-    fun isConnected(context: Context, reply: AirResult) {
+    fun isConnected(context: Context, reply: BandResult) {
         // takeIf, as in measureHeartRate below. The relay sets active before
         // it opens a link and can spend up to ninety seconds waiting on the
         // notification listener first; asking it in that window answered
@@ -56,16 +57,16 @@ internal object Band {
         // sitting right here knew the truth and costs nothing to ask.
         CalendarRelayService.active?.takeIf { it.holdsBand }
             ?.let { return it.readConnection(reply) }
-        own(context).isAirConnected(reply)
+        own(context).isConnected(reply)
     }
 
-    fun readBattery(context: Context, reply: AirResult) =
+    fun readBattery(context: Context, reply: BandResult) =
         operate(context, reply) { air, r -> air.readBattery(r) }
 
-    fun readSignal(context: Context, reply: AirResult) =
+    fun readSignal(context: Context, reply: BandResult) =
         operate(context, reply) { air, r -> air.readSignalStrength(r) }
 
-    fun readDeviceInfo(context: Context, reply: AirResult) =
+    fun readDeviceInfo(context: Context, reply: BandResult) =
         operate(context, reply) { air, r -> air.readDeviceInfo(r) }
 
     /**
@@ -77,7 +78,7 @@ internal object Band {
      * for a buzz now, and refusing them with "could not reach the band" was
      * both a refusal and a lie about the reason.
      */
-    fun buzz(context: Context, reply: AirResult) {
+    fun buzz(context: Context, reply: BandResult) {
         val preset = RelayRuleStore.read(context).defaultPreset
         if (preset.silent) {
             reply.error("SILENT", "Your default vibration is silent.", null)
@@ -89,7 +90,7 @@ internal object Band {
         }
         val pulses = preset.pattern.pulses ?: 1
         val at = System.currentTimeMillis()
-        val recorded = object : AirResult {
+        val recorded = object : BandResult {
             override fun success(result: Any?) {
                 record(context, at, "verified", null, preset.id)
                 reply.success(result)
@@ -118,7 +119,7 @@ internal object Band {
      * relay therefore lends its own link rather than letting a second one be
      * opened, and refuses outright while it is mid-delivery.
      */
-    fun measureHeartRate(context: Context, sink: AirSink): Boolean {
+    fun measureHeartRate(context: Context, sink: BandSink): Boolean {
         // Only defer to the relay when it is actually holding the link. A
         // service that exists but has not taken the band yet must not stop
         // the screen opening one, or Measure refuses for no reason.
@@ -129,7 +130,7 @@ internal object Band {
         busy = true
         measuring = true
         heartSink = sink
-        own(context).readHeartRate(object : AirSink {
+        own(context).readHeartRate(object : BandSink {
             override fun success(event: Any?) = sink.success(event)
             override fun error(code: String, message: String?, details: Any?) {
                 finishMeasuring()
@@ -185,8 +186,8 @@ internal object Band {
         stranded?.error("CLOSED", "The link to the band was closed.", null)
     }
 
-    private fun own(context: Context): AirLink =
-        link ?: AirLink(context.applicationContext).also { link = it }
+    private fun own(context: Context): BandLink =
+        link ?: Bands.open(context).also { link = it }
 
     /** How long to keep waiting out a band that is busy with something else. */
     private const val RETRY_MILLIS = 1_500L
@@ -194,9 +195,9 @@ internal object Band {
 
     private fun operate(
         context: Context,
-        reply: AirResult,
+        reply: BandResult,
         attempt: Int = 0,
-        operation: (AirLink, AirResult) -> Unit,
+        operation: (BandLink, BandResult) -> Unit,
     ) {
         // Only while it is holding the band, again: otherwise a battery read
         // during the relay's start window retried three times over four and a
@@ -207,7 +208,7 @@ internal object Band {
             // opening after another is enough to collide with its own earlier
             // read. Waiting a moment is a better answer than handing that
             // race to the person holding the phone.
-            return relay.readDeviceStatus(object : AirResult {
+            return relay.readDeviceStatus(object : BandResult {
                 override fun success(result: Any?) = reply.success(result)
                 override fun error(code: String, message: String?, details: Any?) {
                     if (code == "BUSY" && attempt < RETRIES) {
@@ -223,7 +224,7 @@ internal object Band {
         handler.removeCallbacks(idle)
         val air = own(context)
         val work = Work(reply) { held ->
-            operation(held, object : AirResult {
+            operation(held, object : BandResult {
                 override fun success(result: Any?) { done(); reply.success(result) }
                 override fun error(code: String, message: String?, details: Any?) {
                     done(); reply.error(code, message, details)

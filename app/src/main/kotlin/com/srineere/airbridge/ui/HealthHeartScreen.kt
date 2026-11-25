@@ -31,7 +31,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.srineere.airbridge.Band
-import dev.airpulse.fitbit_air.AirSink
+import com.srineere.airbridge.band.BandSink
 import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier

@@ -26,7 +26,7 @@ import android.os.IBinder
 import android.os.Looper
 import android.os.PowerManager
 import android.provider.Settings
-import dev.airpulse.fitbit_air.AirLink
+import com.srineere.airbridge.band.BandLink
 import com.srineere.airbridge.health.HealthEnabled
 import com.srineere.airbridge.health.HealthReader
 import com.srineere.airbridge.health.HealthSettings
@@ -37,25 +37,26 @@ import com.srineere.airbridge.health.nextStepCheckMillis
 import com.srineere.airbridge.health.stepWorkWanted
 import com.srineere.airbridge.health.shouldBuzzForGoal
 import com.srineere.airbridge.health.shouldNudgeForHour
-import dev.airpulse.fitbit_air.AirResult
+import com.srineere.airbridge.band.BandResult
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import dev.airpulse.fitbit_air.AirSink
+import com.srineere.airbridge.band.BandSink
+import com.srineere.airbridge.band.Bands
 
 /** User-started example relay; never starts work from a notification callback. */
 class CalendarRelayService : Service() {
-    private var air: AirLink? = null
+    private var band: BandLink? = null
     /**
      * The Air runs one secure session at a time, so band work is serialised
      * here. A message arriving mid-ring waits rather than failing BUSY, which
      * is what the Dart operation queue used to do.
      */
-    private val airQueue = ArrayDeque<(AirLink) -> Unit>()
-    private var airBusy = false
+    private val bandQueue = ArrayDeque<(BandLink) -> Unit>()
+    private var bandBusy = false
     private var heartStreaming = false
     private val healthScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val stepCheck = Runnable { checkStepGoals() }
@@ -257,7 +258,7 @@ class CalendarRelayService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         starting = false
-        if (!enterForeground() && air == null) {
+        if (!enterForeground() && band == null) {
             saveOutcome("Android would not let the relay start. Allow notifications for CUFF, then start again.")
             stopSelf()
             return START_NOT_STICKY
@@ -282,15 +283,15 @@ class CalendarRelayService : Service() {
         // to mean the relay never came back from an OEM kill.
         if (intent?.action == SILENCE) {
             stopRing("silenced")
-            if (air == null) { stopSelf(); return START_NOT_STICKY }
+            if (band == null) { stopSelf(); return START_NOT_STICKY }
             return START_STICKY
         }
         if (intent?.action == PAUSE || intent?.action == RESUME) {
             RelayRuleStore.update(this) { it.copy(silence = it.silence.copy(pauseUntil = if (intent.action == RESUME) 0 else System.currentTimeMillis() + 900_000)) }
-            if (air == null) { stopSelf(); return START_NOT_STICKY }
+            if (band == null) { stopSelf(); return START_NOT_STICKY }
             return START_STICKY
         }
-        if (air != null && !stopping) return START_STICKY
+        if (band != null && !stopping) return START_STICKY
         // Starting again while the last stop is still draining. The link is
         // already closed and nulled; what is left is the stopping flag, and
         // leaving it set would make startWorker() undo itself on its last line.
@@ -324,7 +325,7 @@ class CalendarRelayService : Service() {
     private var listenerWaitUntil = 0L
     private val listenerWait = object : Runnable {
         override fun run() {
-            if (air != null || stopping) return
+            if (band != null || stopping) return
             if (CalendarNotificationListener.connected) { startWorker(); return }
             if (System.currentTimeMillis() > listenerWaitUntil) {
                 requestStop("Notification access did not come back. Start the relay again.")
@@ -341,7 +342,7 @@ class CalendarRelayService : Service() {
             // Only one session to the band, ever: if the UI is holding a link
             // of its own, it lets go here.
             Band.close()
-            air = AirLink(applicationContext)
+            band = Bands.open(applicationContext)
             filter = CalendarAlertFilter(
                 System.currentTimeMillis(),
                 CalendarNotificationListener.existingKeys(selectedPackages), selectedPackages,
@@ -361,35 +362,35 @@ class CalendarRelayService : Service() {
 
     /**
      * Runs [work] against the band once nothing else holds it. [work] must
-     * call [airDone] when its operation completes, however it ends.
+     * call [bandDone] when its operation completes, however it ends.
      *
      * False when there is no link to run against, so that the caller can
      * release what it has already taken. Returning silently left the wake
      * lock held and the alert sitting in flight until the watchdog fired.
      */
-    private fun onAir(work: (AirLink) -> Unit): Boolean {
-        val link = air ?: return false
-        if (airBusy) { airQueue.addLast(work); return true }
-        airBusy = true
+    private fun onBand(work: (BandLink) -> Unit): Boolean {
+        val link = band ?: return false
+        if (bandBusy) { bandQueue.addLast(work); return true }
+        bandBusy = true
         work(link)
         return true
     }
 
-    private fun airDone() {
-        val next = airQueue.removeFirstOrNull()
-        val link = air
-        if (next == null || link == null) { airBusy = false; return }
+    private fun bandDone() {
+        val next = bandQueue.removeFirstOrNull()
+        val link = band
+        if (next == null || link == null) { bandBusy = false; return }
         next(link)
     }
 
     /** Builds the reply for one band operation, freeing the queue either way. */
-    private fun airReply(onResult: (RelayWorkerResult) -> Unit) = object : AirResult {
+    private fun bandReply(onResult: (RelayWorkerResult) -> Unit) = object : BandResult {
         override fun success(result: Any?) {
-            airDone()
+            bandDone()
             onResult(RelayWorkerResult("verified", null))
         }
         override fun error(code: String, message: String?, details: Any?) {
-            airDone()
+            bandDone()
             onResult(RelayWorkerResult("failed", code.takeIf { it.matches(ERROR_CODE) } ?: "WORKER_ERROR"))
         }
     }
@@ -525,7 +526,7 @@ class CalendarRelayService : Service() {
         // its own and does its own bookkeeping.
         // Deliberately not queued: the queue is busy holding the ring, and
         // this is what releases it.
-        runCatching { air?.stopRing() }
+        runCatching { band?.stopRing() }
         // Give Google Health the usual quiet window now that the ring is over,
         // and pick up anything that was waiting while it ran. Dropping this
         // answer left those alerts waiting for a follow-up nobody scheduled.
@@ -576,7 +577,7 @@ class CalendarRelayService : Service() {
         RelayRuleStore.read(this).silence
             .reason(System.currentTimeMillis(), isCall = session.kind == RelayAlertKind.CALL)
             ?.let { stopRing(it); return }
-        if (air == null) { stopRing("worker_unavailable"); return }
+        if (band == null) { stopRing("worker_unavailable"); return }
         val id = nextId()
         begin()
         refreshDeadline()
@@ -598,13 +599,13 @@ class CalendarRelayService : Service() {
             if (ring === session)
                 stopRing(if (result.stage == "verified") "ring_timeout" else "ring_finished")
         }
-        val sent = onAir { link ->
+        val sent = onBand { link ->
             link.ring(
                 intensity = session.match.preset.intensity,
                 gapMillis = session.settings.gapMillis.toLong(),
                 maxMillis = session.settings.maxMillis,
                 pulses = null,
-                result = airReply { finished(it) },
+                result = bandReply { finished(it) },
             )
         }
         if (!sent) finished(RelayWorkerResult("failed", "WORKER_UNAVAILABLE"))
@@ -712,22 +713,22 @@ class CalendarRelayService : Service() {
      * asks the adapter rather than the band, so it costs no session and does
      * not queue behind a notification.
      */
-    internal fun readConnection(reply: AirResult) {
-        val link = air
+    internal fun readConnection(reply: BandResult) {
+        val link = band
         if (link == null) reply.error("NOT_RUNNING", "The relay is not running.", null)
-        else link.isAirConnected(reply)
+        else link.isConnected(reply)
     }
 
-    internal fun readBattery(reply: AirResult) = readDeviceStatus(reply) { link, r -> link.readBattery(r) }
-    internal fun readSignal(reply: AirResult) = readDeviceStatus(reply) { link, r -> link.readSignalStrength(r) }
-    internal fun readDeviceInfo(reply: AirResult) = readDeviceStatus(reply) { link, r -> link.readDeviceInfo(r) }
+    internal fun readBattery(reply: BandResult) = readDeviceStatus(reply) { link, r -> link.readBattery(r) }
+    internal fun readSignal(reply: BandResult) = readDeviceStatus(reply) { link, r -> link.readSignalStrength(r) }
+    internal fun readDeviceInfo(reply: BandResult) = readDeviceStatus(reply) { link, r -> link.readDeviceInfo(r) }
 
     /**
      * Holds the band open for a live heart rate reading.
      *
      * Unlike every other band call this one does not finish on its own, so
      * it takes the same slot a notification would and keeps it: begin() so
-     * the watchdog and wake lock cover it, onAir so alerts queue behind it
+     * the watchdog and wake lock cover it, onBand so alerts queue behind it
      * rather than fighting it for the one session the Air allows. The
      * watchdog bounds it at four minutes even if the screen never calls
      * stop, which is the backstop behind the UI's own two-minute limit.
@@ -933,7 +934,7 @@ class CalendarRelayService : Service() {
         // these, and a nudge that outlived it would make them liars.
         val phoneToo = settings.hourlyNudge && settings.nudgeOnPhone
         if (!ready || stopping) return
-        if (!canPulseBand(ready, stopping, air != null, heartStreaming) && !phoneToo) return
+        if (!canPulseBand(ready, stopping, band != null, heartStreaming) && !phoneToo) return
 
         healthScope.launch {
             val steps = withContext(Dispatchers.IO) { HealthReader().stepsNow(this@CalendarRelayService) }
@@ -1050,7 +1051,7 @@ class CalendarRelayService : Service() {
      * the result of a sent pulse arrives later and is its own question.
      */
     private fun buzzForSteps(reason: String): Boolean {
-        if (!canPulseBand(ready, stopping, air != null, heartStreaming)) return false
+        if (!canPulseBand(ready, stopping, band != null, heartStreaming)) return false
         // Each of the two has its own pulse, so a goal crossed and an hour
         // missed can be told apart without looking at the phone.
         val config = RelayRuleStore.read(this)
@@ -1080,17 +1081,17 @@ class CalendarRelayService : Service() {
             if (stage == "verified") WidgetRefresh.poke(this)
         }
         begin()
-        onAir { link ->
-            link.tap(preset.intensity, object : AirResult {
+        onBand { link ->
+            link.tap(preset.intensity, object : BandResult {
                 override fun success(result: Any?) {
                     record("verified", null)
-                    airDone()
+                    bandDone()
                     end()
                 }
 
                 override fun error(code: String, message: String?, details: Any?) {
                     record("failed", code)
-                    airDone()
+                    bandDone()
                     end()
                 }
             })
@@ -1106,13 +1107,13 @@ class CalendarRelayService : Service() {
      * and "the band is taken" are different questions. Only the second one
      * stops the UI opening a link of its own.
      */
-    internal val holdsBand: Boolean get() = air != null
+    internal val holdsBand: Boolean get() = band != null
 
-    internal fun startHeartRate(sink: AirSink): Boolean {
-        if (!ready || stopping || pending != 0 || air == null || heartStreaming) return false
+    internal fun startHeartRate(sink: BandSink): Boolean {
+        if (!ready || stopping || pending != 0 || band == null || heartStreaming) return false
         heartStreaming = true
         begin()
-        val held = object : AirSink {
+        val held = object : BandSink {
             override fun success(event: Any?) = sink.success(event)
             override fun error(code: String, message: String?, details: Any?) {
                 releaseHeartRate()
@@ -1123,13 +1124,13 @@ class CalendarRelayService : Service() {
                 sink.endOfStream()
             }
         }
-        onAir { link -> link.readHeartRate(held) }
+        onBand { link -> link.readHeartRate(held) }
         return true
     }
 
     internal fun stopHeartRate() {
         if (!heartStreaming) return
-        air?.stopHeartRate()
+        band?.stopHeartRate()
         releaseHeartRate()
     }
 
@@ -1137,21 +1138,21 @@ class CalendarRelayService : Service() {
     private fun releaseHeartRate() {
         if (!heartStreaming) return
         heartStreaming = false
-        airDone()
+        bandDone()
         end()
     }
 
-    internal fun readDeviceStatus(reply: AirResult, operation: (AirLink, AirResult) -> Unit) {
-        if (!ready || stopping || pending != 0 || air == null) {
+    internal fun readDeviceStatus(reply: BandResult, operation: (BandLink, BandResult) -> Unit) {
+        if (!ready || stopping || pending != 0 || band == null) {
             reply.error("BUSY", "The relay is delivering a notification. Try again shortly.", null)
             return
         }
         begin()
-        onAir { link ->
-            operation(link, object : AirResult {
-                override fun success(result: Any?) { airDone(); end(); reply.success(result) }
+        onBand { link ->
+            operation(link, object : BandResult {
+                override fun success(result: Any?) { bandDone(); end(); reply.success(result) }
                 override fun error(code: String, message: String?, details: Any?) {
-                    airDone(); end(); reply.error(code, message, details)
+                    bandDone(); end(); reply.error(code, message, details)
                 }
             })
         }
@@ -1184,7 +1185,7 @@ class CalendarRelayService : Service() {
         // session, so they land close enough together to read as a pattern,
         // and both play at the strength the rule asked for.
         val pulses = preset.pattern.pulses ?: 1
-        val sent = onAir { link ->
+        val sent = onBand { link ->
             if (pulses > 1) {
                 // A pattern is a short bounded ring: every pulse shares one
                 // session, so they land close enough together to read as one
@@ -1194,9 +1195,9 @@ class CalendarRelayService : Service() {
                     gapMillis = PATTERN_GAP_MILLIS.toLong(),
                     maxMillis = 20_000L,
                     pulses = pulses,
-                    result = object : AirResult {
+                    result = object : BandResult {
                         override fun success(result: Any?) {
-                            airDone()
+                            bandDone()
                             val played = ((result as? Map<*, *>)?.get("pulses") as? Int) ?: 0
                             finished(
                                 if (played >= pulses) RelayWorkerResult("verified", null)
@@ -1204,13 +1205,13 @@ class CalendarRelayService : Service() {
                             )
                         }
                         override fun error(code: String, message: String?, details: Any?) {
-                            airDone()
+                            bandDone()
                             finished(RelayWorkerResult("failed", code.takeIf { it.matches(ERROR_CODE) } ?: "WORKER_ERROR"))
                         }
                     },
                 )
             } else {
-                link.tap(preset.intensity, airReply { finished(it) })
+                link.tap(preset.intensity, bandReply { finished(it) })
             }
         }
         if (!sent) finished(RelayWorkerResult("failed", "WORKER_UNAVAILABLE"))
@@ -1259,14 +1260,14 @@ class CalendarRelayService : Service() {
         stopping = true
         stopRing("cancelled")
         saveOutcome(reason)
-        // Nulled as well as closed. holdsBand is `air != null`, so a closed
+        // Nulled as well as closed. holdsBand is `band != null`, so a closed
         // link left in the field says the relay still holds the band's one
         // session: the Device screen's reads answer BUSY, Band refuses to
         // open a link of its own, and Start is swallowed -- for the whole
         // drain, which is up to the watchdog's four minutes when an
         // in-flight command's callback was cut off by the close.
-        runCatching { air?.close() }
-        air = null
+        runCatching { band?.close() }
+        band = null
         handler.removeCallbacks(silenceTick)
         // Here as well as in onDestroy, and alone among the timers, because
         // it is the only one that outlives this process: a handler callback
@@ -1322,10 +1323,10 @@ class CalendarRelayService : Service() {
         if (active === this) active = null
         handler.removeCallbacks(watchdog)
         handler.removeCallbacks(followUp)
-        airQueue.clear()
-        airBusy = false
-        air?.close()
-        air = null
+        bandQueue.clear()
+        bandBusy = false
+        band?.close()
+        band = null
         releaseWakeLock()
         stopForeground(STOP_FOREGROUND_REMOVE)
         super.onDestroy()
