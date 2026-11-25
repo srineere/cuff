@@ -60,6 +60,31 @@ class BandSeamTest {
         )
     }
 
+    /**
+     * The same rule for the second band's transport.
+     *
+     * `org.openstrap` is deliberately not guarded here: the Zepp account
+     * types surface in the sign-in screen and the key store, which is where
+     * they belong. What must not spread is the strap's *link*, for the same
+     * reason the Air's must not.
+     */
+    @Test
+    fun `only its adapter imports the strap transport`() {
+        val importers = kotlinFiles()
+            .filter { file ->
+                file.readLines().any { it.startsWith("import com.srineere.cuff.helio.") }
+            }
+            .map { it.name }
+            .sorted()
+
+        assertEquals(
+            "Only HelioBandLink.kt may import the strap's transport. Anything else " +
+                "wanting the band goes through BandLink.",
+            listOf("HelioBandLink.kt"),
+            importers,
+        )
+    }
+
     private fun kotlinFiles(): List<File> =
         sources.walkTopDown().filter { it.isFile && it.extension == "kt" }.toList()
 }

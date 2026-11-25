@@ -104,11 +104,34 @@ internal fun bandResult(
 /**
  * Where a link comes from.
  *
- * The one place in the app that names a particular band. When a second
- * transport arrives this is what reads the stored choice and returns the
- * other implementation; until then it has one answer, and saying so in one
- * function is the whole reason the rest of the app no longer has to.
+ * The one place in the app that names a particular band, which is what the
+ * rest of this file exists to make possible. It reads the stored pairing and
+ * answers with the matching transport; nothing above it asks which it got.
+ *
+ * The Air is the fallback and not a tie-break: it needs no pairing, so a
+ * phone with no strap set up behaves exactly as it did before any of this.
+ * One band at a time, deliberately — both are one-session devices, and the
+ * queueing above assumes a single link.
  */
 internal object Bands {
-    fun open(context: Context): BandLink = AirBandLink(context.applicationContext)
+    fun open(context: Context): BandLink {
+        val app = context.applicationContext
+        val key = HelioKeyStore.key(app)?.let(::hexToBytes)
+        val address = HelioKeyStore.mac(app)
+        return if (key != null && address != null) HelioBandLink(app, address, key)
+        else AirBandLink(app)
+    }
+
+    /** Which band a screen is describing, for the rows that have to differ. */
+    fun kind(context: Context): BandKind =
+        if (HelioKeyStore.isPaired(context.applicationContext)) BandKind.Helio else BandKind.Air
 }
+
+internal enum class BandKind(val label: String) {
+    Air("Fitbit Air"),
+    Helio("Amazfit Helio Strap"),
+}
+
+/** The stored key is 32 hex characters, which [HelioKeyStore] has already checked. */
+private fun hexToBytes(hex: String): ByteArray =
+    ByteArray(hex.length / 2) { hex.substring(it * 2, it * 2 + 2).toInt(16).toByte() }

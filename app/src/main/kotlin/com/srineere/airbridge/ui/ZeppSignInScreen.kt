@@ -62,6 +62,9 @@ private sealed interface ZeppStep {
 
     /** Google and the rest refuse to run in a web view, so say so rather than show their error. */
     data class ThirdParty(val provider: String) : ZeppStep
+
+    /** Already set up. Opening this screen again is usually to undo it. */
+    data class Paired(val address: String) : ZeppStep
 }
 
 /**
@@ -84,7 +87,14 @@ private val THIRD_PARTY = mapOf(
 internal fun ZeppSignInScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var step by remember { mutableStateOf<ZeppStep>(ZeppStep.SignIn) }
+    var step by remember {
+        mutableStateOf<ZeppStep>(
+            HelioKeyStore.mac(context)
+                ?.takeIf { HelioKeyStore.isPaired(context) }
+                ?.let(ZeppStep::Paired)
+                ?: ZeppStep.SignIn,
+        )
+    }
 
     Column(Modifier.fillMaxSize()) {
         ScreenTitle("Sign in with Zepp", subtitle = zeppStepSubtitle(step), onBack = onBack)
@@ -148,6 +158,19 @@ internal fun ZeppSignInScreen(onBack: () -> Unit) {
                 }
             }
 
+            is ZeppStep.Paired -> Centred {
+                ZeppNote(
+                    "Your strap is paired. Cuff has the key it needs and does not go online " +
+                        "again — buzzing it is Bluetooth and nothing else.",
+                )
+                ZeppNote("Strap ${now.address}", lm = true)
+                TextButton(onClick = {
+                    HelioKeyStore.forget(context)
+                    clearZeppSession()
+                    step = ZeppStep.SignIn
+                }) { Text("Forget this strap") }
+            }
+
             is ZeppStep.ThirdParty -> Centred {
                 Text(
                     "${now.provider} sign-in will not finish inside an app.",
@@ -174,6 +197,7 @@ private fun zeppStepSubtitle(step: ZeppStep): String = when (step) {
     is ZeppStep.Done -> "Paired"
     is ZeppStep.Failed -> "Did not work"
     is ZeppStep.ThirdParty -> "Needs an email sign-in"
+    is ZeppStep.Paired -> "Set up"
 }
 
 /**

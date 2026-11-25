@@ -224,6 +224,11 @@ internal val FAILURE_NOTES = mapOf(
     "HAPTIC_PULSE_FAILED" to "the band wouldn't play the buzz",
     "HAPTIC_FAILED" to "the band wouldn't play the buzz",
     "RING_FAILED" to "the band wouldn't ring",
+    // The Helio Strap's two. Everything else it can fail at is one of the
+    // codes above happening to a different radio, which is why it reports
+    // those rather than inventing a second vocabulary for one fault.
+    "STRAP_REFUSED_KEY" to "the strap wouldn't accept its pairing key",
+    "NOT_ON_THIS_BAND" to "this band can't do that",
 )
 
 internal data class RelayWorkerResult(val stage: String, val errorCode: String?) {

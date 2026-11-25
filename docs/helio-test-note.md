@@ -16,15 +16,15 @@ and it needs someone who owns one.
 It installs as **"Cuff Helio"**, a separate app. It will not touch anything
 else on your phone.
 
-## What it does NOT do yet
+## What it should do
 
-**It will not buzz your strap.** That part is not written. Please do not
-judge it on that.
+Make your strap buzz for your phone's notifications and calls. It has never
+been run against a real strap, so "should" is doing real work in that
+sentence — you are the first person to try it.
 
-What it is testing is the step *before* buzzing: whether a second app can get
-hold of the strap's pairing key at all while the Zepp app still owns the
-strap. Nobody knows the answer, and it decides whether the rest is worth
-building.
+Two unknowns it answers, in order. Whether a second app can get the strap's
+pairing key while the Zepp app still owns the strap. And then whether the
+strap will actually take a command from something that is not Zepp.
 
 ## What to do
 
@@ -34,22 +34,28 @@ building.
 3. Sign in with your Zepp **email and password**. Google or Apple sign-in
    will not work inside an app — if that is all your account has, you can
    add an email password in the Zepp app, or stop here and say so.
-4. Tap **I have signed in — find my strap**.
-5. Tell me what the screen says.
+4. Tap **I have signed in — find my strap**. Tell me what it says.
+5. If it said **Paired**: go back to **Device** and tap **Buzz the band**,
+   with the strap on your wrist.
+6. If that buzzed: turn the relay on from the **Alerts** tab, allow the
+   permissions it asks for, pick an app or two under **Apps**, and send
+   yourself a message.
 
 ## What I need back
 
-Just the outcome of step 5, in whatever words:
+Whatever happened, at each step you got to. Most useful:
 
-- **"Paired"** plus the strap address it shows — the best answer, and the
-  one that means this is worth building.
-- **"That Zepp account has no Helio Strap on it"** — the account is fine but
-  the strap is not listed on it.
-- **"Zepp knows your strap but did not give out its pairing key"** — the
-  interesting failure, and the one I half expect. It means Zepp withholds the
-  key while its own app holds the strap.
-- Anything else, including a crash. If it crashes, **Device → About** has a
-  crash log you can copy out and send.
+- **Did step 4 say "Paired"?** If not, the exact words — "no Helio Strap on
+  it" and "did not give out its pairing key" mean quite different things.
+- **Did step 5 buzz?** If nothing happened, roughly how long you waited.
+- **Did step 6 buzz, and how long after the notification?**
+- Anything that looked wrong, and the wording of any failure in the
+  **Alerts** list. Those sentences are deliberately specific.
+- If it crashes, **Device → About** has a crash log you can copy out.
+
+Keep Zepp installed. Whether the two can share the strap is part of what
+this is testing — if buzzing only works with Zepp force-stopped, that is a
+useful answer too, not a failure.
 
 ## What it does with your Zepp account
 
