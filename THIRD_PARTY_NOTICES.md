@@ -23,6 +23,34 @@ The Kotlin sources under
 upstream Android bindings and retain their SPDX headers. They include limited
 adaptations: a per-stack TLS key resolver and logging cleanups.
 
+## OpenStrap / unstrap (the Amazfit Helio Strap protocol)
+
+- Source: https://github.com/sayed0am/unstrap
+- Commit: `0d323c9bfb74f5374e49f90013888fb0e57fdc57`, 23 November 2026
+- Copyright 2026 OpenStrap contributors
+- License: dual MIT **OR** Apache-2.0; used here under **MIT**, which is the
+  licence the rest of this repository uses. Both texts are checked in, at
+  [`third_party/unstrap/LICENSE-MIT`](third_party/unstrap/LICENSE-MIT) and
+  [`third_party/unstrap/LICENSE-APACHE`](third_party/unstrap/LICENSE-APACHE).
+
+The Kotlin sources under [`helio/src/`](helio/src) are a verbatim copy of the
+buzz-relevant subset of that project's `protocol` module — the Zepp channel,
+its authentication and B-163 key exchange, the chunk framing, the service
+registry, device features and Find Device. They keep their upstream package,
+`org.openstrap.protocol`, for the same reason the Golden Gate bindings keep
+theirs: a vendored copy that has been renamed can no longer be diffed against
+the project it came from. Every file carries a header naming the commit above,
+and each is unmodified apart from that header.
+
+The subset is deliberate. The upstream module is about four times this size;
+history fetch, firmware update, alarms, settings, sport sessions and readiness
+are not copied, because Cuff reads the strap's measurements from Health
+Connect rather than from the strap. The upstream tests covering what *is*
+copied came with it and run in CI.
+
+Nothing from the Zepp or Amazfit Android applications is included in this
+repository, in a release APK, or loaded at runtime.
+
 ## Mbed TLS (statically linked into `libgg.so`)
 
 - Source: https://github.com/Mbed-TLS/mbedtls, release 2.28.10

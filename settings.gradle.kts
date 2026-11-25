@@ -18,4 +18,5 @@ rootProject.name = "cuff"
 
 include(":app")
 include(":air")
+include(":helio")
 include(":baselineprofile")

@@ -33,7 +33,7 @@ jobs:
         run: ./gradlew :app:assembleDebug --console=plain
 
       - name: Unit tests
-        run: ./gradlew :app:testDebugUnitTest :air:testDebugUnitTest --console=plain
+        run: ./gradlew :app:testDebugUnitTest :air:testDebugUnitTest :helio:test --console=plain
 
       # minSdk is 28 and the app is built against 36, so this is what stands
       # between the two. It fails the build on an error, which is the point.
