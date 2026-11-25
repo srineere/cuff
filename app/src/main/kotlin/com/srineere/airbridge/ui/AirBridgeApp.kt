@@ -482,6 +482,7 @@ fun AirBridgeApp(openRoute: String? = null, openCount: Int = 0) {
                     HealthNutritionScreen(onBack = nav::popBackStack, onOpen = nav::navigate)
                 }
                 pushed("appearance") { AppearanceScreen(onBack = nav::popBackStack) }
+                pushed("zeppsignin") { ZeppSignInScreen(onBack = nav::popBackStack) }
                 pushed("healthsavedfoods") {
                     HealthSavedFoodsScreen(onBack = nav::popBackStack)
                 }

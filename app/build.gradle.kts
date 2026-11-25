@@ -116,12 +116,35 @@ android {
             // :air and :helio publish debug and release and nothing else,
             // so this build type has to say which of theirs it wants.
             matchingFallbacks += listOf("debug")
+            // Minified, unlike debug, because this is the build that gets
+            // sent to somebody: unminified Compose is 117 MB of dex, which
+            // is a thing you cannot put in a chat window. R8 runs with the
+            // app's own rules, so this is also the only variant that proves
+            // they still cover the second band's code.
+            // Not debuggable, which is what lets R8 actually optimise:
+            // a debuggable build keeps every optimisation off and still
+            // came out at 73 MB. Nothing is lost that matters remotely --
+            // the About screen's own crash log is what a tester sends
+            // back, and it survives minification.
+            isDebuggable = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
         }
         release {
             resValue("string", "app_name", "Cuff")
             // Debug stays unminified, so what is installed on the phone during
             // development is never what R8 produced. See proguard-rules.pro
             // for the one part of this app it cannot reason about.
+            // Not debuggable, which is what lets R8 actually optimise:
+            // a debuggable build keeps every optimisation off and still
+            // came out at 73 MB. Nothing is lost that matters remotely --
+            // the About screen's own crash log is what a tester sends
+            // back, and it survives minification.
+            isDebuggable = false
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")

@@ -38,6 +38,7 @@ import androidx.compose.material.icons.outlined.SignalCellularAlt
 import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material.icons.outlined.Vibration
 import androidx.compose.material.icons.outlined.Watch
+import androidx.compose.material.icons.outlined.Watch
 import androidx.compose.material.icons.outlined.Widgets
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
@@ -82,6 +83,7 @@ import com.srineere.airbridge.ui.theme.extras
 import com.srineere.airbridge.widget.BandStore
 import com.srineere.airbridge.widget.WidgetRefresh
 import com.srineere.airbridge.ui.theme.isAvailable
+import com.srineere.airbridge.band.HelioKeyStore
 import com.srineere.airbridge.band.bandResult
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.delay
@@ -229,6 +231,15 @@ internal fun DeviceScreen(onOpen: (String) -> Unit) {
             subtitle = appearanceSummary(appearance),
             icon = Icons.Outlined.Palette,
             onClick = { onOpen("appearance") },
+        )
+        // The second band, while it is still an experiment. It is a door to
+        // a Zepp sign-in and the only networked thing in this app, so it
+        // says what it costs before it is opened rather than after.
+        SettingsRow(
+            title = "Amazfit Helio Strap",
+            subtitle = helioSummary(LocalContext.current),
+            icon = Icons.Outlined.Watch,
+            onClick = { onOpen("zeppsignin") },
         )
         SettingsRow(
             title = "Permissions",
@@ -717,3 +728,12 @@ private fun permissionsSummary(): String {
     }
 }
 
+
+/**
+ * What the Helio row says without being opened: whether a key is stored, and
+ * the one thing somebody should know before tapping it.
+ */
+@Composable
+private fun helioSummary(context: android.content.Context): String =
+    if (HelioKeyStore.isPaired(context)) "Paired · signed in with Zepp"
+    else "Experimental. Needs a Zepp sign-in — the only part of Cuff that goes online"
