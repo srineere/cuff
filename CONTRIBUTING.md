@@ -35,7 +35,7 @@ is built, written for somebody arriving cold.
 ```
 
 ```bash
-./gradlew :app:testDebugUnitTest :air:testDebugUnitTest :helio:test
+./gradlew :app:testDebugUnitTest :air:testDebugUnitTest :helio:testDebugUnitTest
 ```
 
 ```bash

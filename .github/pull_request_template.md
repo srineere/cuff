@@ -11,7 +11,7 @@ not conventional-commit prefixes — write the same way here.
 <!-- Tick what applies, and say what was actually run or looked at. -->
 
 - [ ] `./gradlew :app:assembleDebug`
-- [ ] `./gradlew :app:testDebugUnitTest :air:testDebugUnitTest :helio:test`
+- [ ] `./gradlew :app:testDebugUnitTest :air:testDebugUnitTest :helio:testDebugUnitTest`
 - [ ] `./gradlew :app:lintDebug`
 - [ ] Tried on a phone — say which, and which Android version
 - [ ] Tried with a band paired — say which firmware

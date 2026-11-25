@@ -19,16 +19,28 @@ get it in the changelog entry for the fix.
 
 Worth stating plainly, because it is unusual.
 
-**The app has no network access.** It does not request Android's `INTERNET`
-permission, so the operating system will refuse it a socket. There is no
-server, no account, no sync and no telemetry. That removes most of what a
-vulnerability report usually concerns and leaves a short list.
+**There is no server, no sync and no telemetry**, and the app reaches the
+network in exactly one place: the `:helio` module, which signs in to the
+owner's Zepp account to fetch an Amazfit Helio Strap's pairing key. That
+module declares the `INTERNET` permission in its own manifest and is the only
+code in the repository that can open a socket. Everything else — the Fitbit
+Air transport, the relay, the Health tab, the widgets — runs with the radio
+off, and a build without `:helio` cannot reach the network at all.
 
-In scope:
+That makes the list short but no longer empty:
 
-- **The Bluetooth transport** (`:air`) — Golden Gate over DTLS over GATT, and
-  the CoAP messages on top of it. The vendored stack is upstream's; a flaw in
-  the vendoring, the key handling or the session lifecycle is ours.
+- **The Zepp sign-in** (`:helio`). A web view onto Zepp's own login page, a
+  session cookie read back from it, one call to a device-list endpoint, and a
+  token and pairing key in private storage. Anything that leaks the cookie,
+  the token or the key, sends them anywhere other than Zepp, widens that one
+  call, or lets the web view navigate somewhere it should not, is in scope
+  and is the first thing worth looking at. No password is ever handled by
+  Cuff; if you find one being handled, that is a bug of the highest kind
+  here.
+- **The Bluetooth transports.** `:air` is Golden Gate over DTLS over GATT
+  with CoAP on top; `:helio` is the Zepp channel with its own B-163 key
+  exchange. Both stacks are vendored; a flaw in the vendoring, the key
+  handling or the session lifecycle is ours.
 - **The notification listener.** Cuff is granted every notification the phone
   posts. It reads metadata — package, channel, category, whether it is a call —
   and deliberately not message text or sender names. Anything that makes text

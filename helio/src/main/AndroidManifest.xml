@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The only INTERNET permission in this repository, and the only reason there
+  is one.
+
+  The Helio Strap will not speak to anything that cannot prove it holds the
+  strap's auth key, and that key is issued by Zepp's cloud against the
+  account the strap was first linked to. There is no offline way to obtain
+  one: the project this transport is vendored from looked, and has no
+  local-binding path either. So buzzing a Helio Strap costs exactly one
+  network call, the device list for the signed-in account, and the
+  permission that makes it possible.
+
+  It is declared here rather than in the app's manifest on purpose. This is
+  the only module that opens a socket; dropping the module drops the
+  permission, which is the property worth having. Nothing in :app, :air or
+  the Health tab reaches the network, and the Air half of the app still
+  works with the radio off.
+
+  PRIVACY.md says the same thing in the words somebody installing this
+  would use.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+</manifest>

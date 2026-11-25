@@ -452,7 +452,7 @@ The other documents:
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) — how to send something, what is easy to
   get wrong here, and what this project is not going to do.
 - [`SECURITY.md`](SECURITY.md) — where to report privately, and what the attack
-  surface is for an app with no network access.
+  surface is, and where the one network call lives.
 - [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) — Contributor Covenant 2.1.
 - [`press/`](press/) — the store-style cards at the top of this file, the
   captures they are built from, and the scripts that build them.

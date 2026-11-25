@@ -62,7 +62,7 @@ jobs:
       # The same three CI runs, because a tag is not a reason to publish
       # something that does not compile or lint.
       - name: Unit tests
-        run: ./gradlew :app:testDebugUnitTest :air:testDebugUnitTest :helio:test --console=plain
+        run: ./gradlew :app:testDebugUnitTest :air:testDebugUnitTest :helio:testDebugUnitTest --console=plain
 
       - name: Lint
         run: ./gradlew :app:lintDebug --console=plain

@@ -11,13 +11,35 @@ that arrives, who is calling, and — if you switch the Health tab on — your
 steps, sleep and heart rate.
 
 **None of it leaves your phone.** Not to us, not to anyone else. There is no
-account, no sign-in, no analytics, no crash reporting, no advertising, and no
-server belonging to this app for data to be sent to.
+analytics, no crash reporting, no advertising, and no server belonging to
+this app for anything to be sent to.
 
-That is not only a promise. The app does not request Android's `INTERNET`
-permission, which is what Android checks before any app may open a network
-connection. A build that tried to send your data somewhere would be stopped
-by the operating system, not by our good intentions.
+**There is one exception, and it is not ours.** If you set up an Amazfit
+Helio Strap, Cuff signs in to *your own Zepp account* and asks Zepp for the
+list of devices on it, because that list is the only place the strap's
+pairing key exists. Nothing about you and nothing you have measured goes with
+that request; it carries your Zepp token and your Zepp user id and asks one
+question. Once the key is stored the call is never made again, and you can
+sign out and the strap still buzzes.
+
+This is a real change in what this app is, so it is worth saying plainly what
+it cost. Until the Helio Strap, Cuff did not request Android's `INTERNET`
+permission at all, and that was the strongest promise in this document: a
+build that tried to send your data somewhere would have been stopped by the
+operating system rather than by our good intentions. That is no longer true,
+and no wording can make it true again.
+
+What is still true, and checkable:
+
+- **The Fitbit Air half never touches the network.** Notifications, calls,
+  rules, the relay, the Health tab and the widgets work with the radio off.
+- **The permission lives in one module**, `:helio`, which is the only code in
+  the repository that can open a socket. It declares the permission in its
+  own manifest, so a build without that module is a build that physically
+  cannot reach the network.
+- **There is exactly one request**, to Zepp, and only after you ask for a
+  Helio Strap. `helio/src/main/kotlin/org/openstrap/app/zepp/ZeppCloud.kt` is
+  the whole of it.
 
 ## What the app reads, and why
 
@@ -77,17 +99,36 @@ starts empty.
 
 ## Who it is shared with
 
-Nobody. There is no third party, no analytics provider, no advertising
-network, no cloud sync, and no data sold or transferred to anyone for any
-purpose.
+No analytics provider, no advertising network, no cloud sync of your
+readings, and nothing sold or transferred to anyone for any purpose.
 
-Two things leave the app only because you ask them to, and only where you
+Three things leave the app only because you ask them to, and only where you
 send them:
 
 - **Export** writes your readings as CSV files to a location you pick in the
   system file picker.
 - **Food logging** writes nutrition records to Health Connect, where other
   apps you have authorised can read them.
+- **The Zepp sign-in**, if and only if you set up a Helio Strap. You sign in
+  on Zepp's own page, in a web view; Cuff never sees your password, only the
+  session cookie that page leaves behind. It then asks Zepp's device-list
+  endpoint for the straps on your account. Your health data is not sent, not
+  requested and not involved.
+
+## Your Zepp sign-in, if you have one
+
+Kept in the app's private storage: the Zepp session token, your Zepp user id,
+and the strap's pairing key. No password is stored, because none is ever
+seen.
+
+It exists for one reason — the strap refuses to talk to anything that cannot
+prove it holds that key, and Zepp issues the key. There is no offline way to
+get one; the open-source project this transport is built from looked, and
+has no local-pairing path either.
+
+The Device screen can forget all of it, which signs you out and leaves the
+strap unusable until you sign in again. Forgetting it does not touch your
+Zepp account.
 
 ## Deleting it
 
@@ -114,16 +155,18 @@ starting at: `app/src/main/AndroidManifest.xml`, which is the whole list of
 what the app may do, and `health/HealthWriter.kt`, which is the only code in
 the repository that writes anything anywhere.
 
-One claim can be checked without reading a line, and it is the one that
-matters most: an app's permissions are listed in the APK itself. Any APK
-inspector, or Android's own app info screen, will show that Cuff does not hold
-the `INTERNET` permission — and an app without it cannot open a network
-connection, whatever its code says.
+If you inspect the APK rather than the source, you will find the `INTERNET`
+permission and should: this document would be lying if you did not. What the
+APK cannot show you is that it is reached from one file. The source can, and
+`helio/src/main/AndroidManifest.xml` says why it is there at all.
 
-One honest note for anyone who does inspect the APK: the vendored Golden Gate
-transport includes an OkHttp-based remote-debugging class from upstream, so
-OkHttp appears among the bundled libraries. Nothing in Cuff calls it, and
-without the `INTERNET` permission it could not open a connection if it did.
+Two honest notes for anyone who does inspect the APK. The vendored Golden
+Gate transport includes an OkHttp-based remote-debugging class from upstream,
+so OkHttp appears among the bundled libraries; nothing in Cuff calls it. And
+the Zepp request identifies itself as Zepp's own app, because Zepp's
+device-list endpoint will not answer a client it does not recognise. That is
+how the key is obtained at all, and it is made with your token, for your
+account, asking only which straps are on it.
 
 ## Changes
 

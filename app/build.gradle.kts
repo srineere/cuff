@@ -95,6 +95,28 @@ android {
             // everything set up in it for the sake of a word nobody sees.
             resValue("string", "app_name", "Cuff")
         }
+        // The second band's workbench, installed beside a working Cuff
+        // rather than over it.
+        //
+        // This branch adds a network permission and a cloud sign-in to an
+        // app whose whole job is to be trusted with every notification the
+        // phone posts. Trying that on the install somebody actually relies
+        // on is how you lose an evening and a day of alert history, so it
+        // gets an id of its own: com.srineere.cuff.helio is a third app to
+        // Android, with its own storage, its own permission grants and its
+        // own Health Connect consent. Deleting it takes nothing with it.
+        //
+        // Everything else is debug's: unminified, debuggable, debug key.
+        create("helio") {
+            initWith(getByName("debug"))
+            applicationIdSuffix = ".helio"
+            // Here the label does change, because the point is to tell two
+            // icons apart in the launcher at a glance.
+            resValue("string", "app_name", "Cuff Helio")
+            // :air and :helio publish debug and release and nothing else,
+            // so this build type has to say which of theirs it wants.
+            matchingFallbacks += listOf("debug")
+        }
         release {
             resValue("string", "app_name", "Cuff")
             // Debug stays unminified, so what is installed on the phone during
@@ -117,6 +139,7 @@ android {
 
 dependencies {
     implementation(project(":air"))
+    implementation(project(":helio"))
     // Writes the recorded profile into the APK. The library that
     // installs it at runtime is already here through Compose.
     baselineProfile(project(":baselineprofile"))
